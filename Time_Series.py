@@ -8,6 +8,7 @@ pd.set_option('display.width', 1000)
 from datetime import datetime
 from datetime import date
 import re
+import time
 
 def TS_All_Proteins(meta_path, 
                     variant_events_directory,
@@ -148,7 +149,7 @@ def time_series_pipeline(meta_path,
                          time_series_htmp_table_directory=None,
                          n_seq_by_continent_directory=None,
                          top_combinations_directory=None,
-                         continent="Worldwide",
+                         continent="Global",
                          exclude_singletons=True,
                          cmap="YlGnBu",
                          **cmap_kwargs):
@@ -203,6 +204,7 @@ def time_series_pipeline(meta_path,
     ----------
     None. All output written to file at directories specified. 
     """
+    time_start=time.time()
     #Return error for incorrect continent entries
     if type(continent)==list:
         #If a list is passed to continent 
@@ -215,12 +217,14 @@ def time_series_pipeline(meta_path,
     
     #Create output file paths within entered directories
     #Required files
-    metadata_variants_out=metadata_variants_directory+protein+"_Metadata_with_Variants.csv"
+    metadata_variants_out=metadata_variants_directory+protein+"_Metadata_with_Variants.tsv"
     #Optionl files
     if n_seq_by_continent_directory:
         n_seq_by_continent_out=n_seq_by_continent_directory+protein+"_Total_Seq_by_Continent.csv"
     if top_combinations_directory:
-        top_combinations_out=top_combinations_directory+protein+"_Variant_Combinations.csv"
+        top_combinations_out=top_combinations_directory+protein+"_Variant_Combinations.tsv"
+    else:
+        top_combinations_out=None
     
     #Step 1: generate metadata-cluster pairs
     print("Step 1: Link Metadata to Cluster IDs")
@@ -236,8 +240,10 @@ def time_series_pipeline(meta_path,
     if top_combinations_out:
         print("Step 2a: Generate Top Mutation Combinations for",protein)
         top_combinations=find_top_combinations(variants_each_cluster,variant_events,protein)
-        top_combinations.to_csv(top_combinations_out)
-        print("CSV for Top Combinations for {} written to {}".format(protein,top_combinations_out))
+        #For output, the lists of variant combinations need to be converted to comma-separated strings to improve readability.
+        top_combinations["Variants"]=top_combinations["Variants"].apply(lambda x:variant_list_to_string(x))
+        top_combinations.to_csv(top_combinations_out,sep="\t",chunksize=1000)
+        print("Variant Combinations for {} written to {}".format(protein,top_combinations_out))
         print()
 
     #Step 3: map variant list to metadata and Clean metadata
@@ -297,6 +303,8 @@ def time_series_pipeline(meta_path,
         #Heatmap table generation is optional
         if time_series_htmp_table_directory:
             time_series_htmp_table_out=time_series_htmp_table_directory+protein+"_Heatmap_Table_"+continent+".xlsx"
+        else:
+            time_series_htmp_table_out=None
         
         #Step 4: Generate time series of mutation events
         time_series_cont=time_series_generation(cont_subset,codes,protein,start_dates,end_dates,time_series_freq_out)
@@ -306,15 +314,18 @@ def time_series_pipeline(meta_path,
 
         #Step 6: Create heatmap table from percentage data
         if time_series_htmp_table_out:
-            global_percentage_HT=heatmap_table(global_percentage,time_series_htmp_table_out,protein,cmap="YlGnBu",**cmap_kwargs)
+            global_percentage_HT=create_heatmap_table(global_percentage,time_series_htmp_table_out,protein,cmap="YlGnBu",**cmap_kwargs)
         #Progress meter: increase by one
         progress+=1
-        
+       
+    time_end=time.time()
+    print("\nTime Series for {} complete.".format(protein))
     print("Frequency data written to",time_series_frequency_directory)
     print("Percentage data written to",time_series_percent_directory)
     if time_series_htmp_table_directory:
         print("Heatmap tables written to",time_series_htmp_table_directory)
-        
+    print("Total time elapsed: {}".format(time_end-time_start))
+    
 def extract_id(entry, field_index=3):
     """
     When applied to the "Input_ID" column of the USEARCH cluster information dataset, this function will yield the GISAID accession ID.
@@ -469,6 +480,14 @@ def variant_list_by_cluster(variant_events_path, protein):
     cluster_colname="Cluster_Name_"+protein
     #Create Pandas df
     variants_each_cluster=pd.DataFrame(data,columns=[cluster_colname,'Variants'])
+    
+    #Add number of amino acid changes in each cluster to the new dataframe
+    print("Adding number of variants column to variants by cluster dataset.")
+    tic=time.time()
+    variants_each_cluster["Number_of_Variants"]=variants_each_cluster["Variants"].apply(lambda x:count_AA_changes(x,variant_events))
+    toc=time.time()
+    print("Complete. Time elapsed:",toc-tic,"seconds.")
+    
     #Return the created dataset, along with the variant events table and the list of unique codes, which are used in subsequent steps.
     return variants_each_cluster,variant_events,codes
 
@@ -483,7 +502,7 @@ def find_top_combinations(variants_each_cluster,variant_events,protein):
     top_combinations=variants_each_cluster.merge(size_map,how="inner",on="Cluster_ID")
     
     #Add Column for number of mutations in cluster
-    top_combinations["Number_of_Variants"]=top_combinations["Variants"].apply(lambda x:count_AA_changes(x,variant_events))
+    #top_combinations["Number_of_Variants"]=top_combinations["Variants"].apply(lambda x:count_AA_changes(x,variant_events))
 
     return top_combinations
 
@@ -561,13 +580,18 @@ def clean_metadata(metadata_with_variants,variant_events,metadata_variants_out=N
     fill_nans=lambda x:[] if x is np.nan else x
     standard_date['Variants']=standard_date['Variants'].apply(fill_nans)
 
-    #Create a column specifying the number of variants relative to the reference strain for each sequence
-    standard_date["Number_of_Variants"]=standard_date["Variants"].apply(lambda x:count_AA_changes(x,variant_events))
-    
     #Write cleaned file to csv if specified
     if metadata_variants_out:
         print("Writing cleaned metadata with variants to {}.".format(metadata_variants_out))
-        standard_date.to_csv(metadata_variants_out)
+        #Create a copy of the standard_date table and change the variants column to a comma-separated string for output
+        meta_var_table=standard_date.copy()
+        meta_var_table["Variants"]=meta_var_table["Variants"].apply(lambda x:variant_list_to_string(x))
+        time_1=time.time()
+        print("Creation of CSV file")
+        meta_var_table.to_csv(metadata_variants_out,sep="\t",chunksize=1000)
+        time_2=time.time()
+        print("Complete. Time elapsed:",time_2-time_1,"seconds.")
+    
     return standard_date
 
 def date_range_generator_weekly(start_date,end_date):
@@ -610,6 +634,13 @@ def date_range_generator_weekly(start_date,end_date):
     end_dates=pd.date_range(start=end_initial,end=end_date,freq="W-SAT")
     return start_dates,end_dates
 
+def variant_list_to_string(var_list):
+    """
+    Changes cluster variant combinations into a format readable to external scripts.
+    """
+    delim=","
+    return(delim.join(var_list))
+
 def to_1D(series):
     """
     Code from https://towardsdatascience.com/dealing-with-list-values-in-pandas-dataframes-a177e534f173
@@ -617,7 +648,7 @@ def to_1D(series):
     """
     return pd.Series([x for _list in series for x in _list],dtype='object')
 
-def time_series_generation(standard_date,codes,protein,start_dates,end_dates,time_series_freq_out=None):
+def time_series_generation(standard_date,codes,protein,start_dates,end_dates,time_series_freq_out=None,verbose=False):
     #The list 'data' below will store each column of the time seies analysis.
     #Each element in the list will be a list of the frequencies of each variant for the week represented by the variant.
     data=[]
@@ -661,6 +692,8 @@ def time_series_generation(standard_date,codes,protein,start_dates,end_dates,tim
         name="Week{} ({}-{})".format(w+1,start_dates[w].strftime('%m/%d/%Y'),end_dates[w].strftime('%m/%d/%Y'))
         column_names.append(name)
     print("Computing Time Series of Variants for Week {} out of {}. {:.1%} complete\r".format(len(start_dates),len(start_dates),1.000),end="")
+    #line below erases progress meter once complete
+    print(" "*100+"\r",end="")
     
     #Create Pandas DafaFrame from the data
     #Form a np.array first, then transpose (each list represents a column, and default is for each list to represent a row)
@@ -668,12 +701,13 @@ def time_series_generation(standard_date,codes,protein,start_dates,end_dates,tim
     time_series_global=pd.DataFrame(data=data,index=row_names,columns=column_names)
     
     #Write DataFrame to CSV
-    print("Writing Time Series Frequency Dataframe to {}.".format(time_series_freq_out))
-    time_series_global.to_csv(time_series_freq_out,sep=",")
+    if verbose==True:
+        print("Writing Time Series Frequency Dataframe to {}.".format(time_series_freq_out))
+    time_series_global.to_csv(time_series_freq_out,sep=",",chunksize=1000)
     
     return time_series_global
 
-def percentage_table(time_series_global,time_series_percent_out):
+def percentage_table(time_series_global,time_series_percent_out,verbose=False):
     def normalize_to_percentage(df):
         """
         This function is used only in the creation of the percentage table. Each frequency value is divided by the number of sequences analyzed to yield the percentage of sequences containing each variant.
@@ -691,11 +725,12 @@ def percentage_table(time_series_global,time_series_percent_out):
         df=df.iloc[1:,:]
         return df
     global_percentage=normalize_to_percentage(time_series_global)
-    global_percentage.to_csv(time_series_percent_out,sep=",")
-    print("Time series percentage dataframe written to {}.".format(time_series_percent_out))
+    global_percentage.to_csv(time_series_percent_out,sep=",",chunksize=1000)
+    if verbose==True:
+        print("Time series percentage dataframe written to {}.".format(time_series_percent_out))
     return global_percentage
 
-def heatmap_table(global_percentage,time_series_HT_out,protein,cmap,**cmap_kwargs):
+def create_heatmap_table(global_percentage,time_series_HT_out,protein,cmap,verbose=False,**cmap_kwargs):
     """
     Arguments
     ----------
@@ -717,7 +752,8 @@ def heatmap_table(global_percentage,time_series_HT_out,protein,cmap,**cmap_kwarg
     #Show percentage values with 5 decimal places and color cells according to values, with 0.1% as the minimum value for coloration
     global_percentage_HT=global_percentage.style.format("{0:.5%}").background_gradient(cmap,**cmap_kwargs)
     global_percentage_HT.to_excel(time_series_HT_out,sheet_name="{} - Global".format(protein))
-    print("Heatmap table written to {}.".format(time_series_HT_out))
+    if verbose==True:
+        print("Heatmap table written to {}.".format(time_series_HT_out))
     return global_percentage_HT
 
 def total_seq_by_continent(meta_clean_path,protein,start_date,end_date,output_path=None):
@@ -740,7 +776,7 @@ def total_seq_by_continent(meta_clean_path,protein,start_date,end_date,output_pa
     start_dates,end_dates=date_range_generator_weekly(start_date,end_date)
     #Load metadata
     print("Loading metadata at",meta_clean_path)
-    metadata_clean=pd.read_csv(meta_clean_path,parse_dates=['date'],infer_datetime_format=True,dtype="object")
+    metadata_clean=pd.read_csv(meta_clean_path,sep="\t",parse_dates=['date'],infer_datetime_format=True,dtype="object")
     
     #Generate column names from dates entered
     column_names=[]
@@ -788,6 +824,6 @@ def total_seq_by_continent(meta_clean_path,protein,start_date,end_date,output_pa
 
     #Write dataframe to file
     if output_path:
-        seq_continent.to_csv(output_path)
+        seq_continent.to_csv(output_path,chunksize=1000)
         print("Output written to",output_path,sep=" ")
     return seq_continent
