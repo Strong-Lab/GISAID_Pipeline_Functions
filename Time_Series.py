@@ -102,6 +102,17 @@ def TS_All_Proteins(meta_path,
         if os.path.isdir(top_combinations_directory)==False:
             os.mkdir(top_combinations_directory)
     
+    #If variant_combinationsis true, create two directories for frequency and percentage data of combos, respectively
+    if variant_combinations==True:
+        #Variant Combinations TS: Frequency
+        combos_TS_freq_directory=time_series_directory+"Variant_Combinations_TS_Frequency/"
+        if os.path.isdir(combos_TS_freq_directory)==False:
+            os.mkdir(combos_TS_freq_directory)
+        #Variant Combinations TS: Percentage
+        combos_TS_percentage_directory=time_series_directory+"Variant_Combinations_TS_Percentage/"
+        if os.path.isdir(combos_TS_percentage_directory)==False:
+            os.mkdir(combos_TS_percentage_directory)
+    
     #Load reference cluster data
     ref_names=find_ref_cluster_name(where_ref_path)
     #As long as default file formats are preserved, the MSA reader produces one directory for each protein analyzed. 
@@ -118,22 +129,20 @@ def TS_All_Proteins(meta_path,
         #Run Time Series Computation
         print("Protein:",protein)
         time_series_pipeline(meta_path,
-                             variant_events_path,
-                             cluster_path,
-                             protein,
-                             start_date,
-                             end_date,
-                             ref_cluster,
-                             metadata_variants_directory,
-                             time_series_frequency_directory,
-                             time_series_percent_directory,
-                             time_series_htmp_table_directory,
-                             n_seq_by_continent_directory,
-                             top_combinations_directory,
-                             continent,
-                             exclude_singletons,
-                             cmap,
-                             **cmap_kwargs)
+                         variant_events_path,
+                         cluster_path,
+                         protein,
+                         start_date,
+                         end_date,
+                         ref_cluster,
+                         time_series_directory,
+                         heatmap_table,
+                         n_seq_by_continent,
+                         variant_combinations,
+                         continent,
+                         exclude_singletons,
+                         cmap,
+                         **cmap_kwargs)
         print("-"*80)
 
 def time_series_pipeline(meta_path,
@@ -143,12 +152,10 @@ def time_series_pipeline(meta_path,
                          start_date,
                          end_date,
                          ref_cluster,
-                         metadata_variants_directory,
-                         time_series_frequency_directory,
-                         time_series_percent_directory,
-                         time_series_htmp_table_directory=None,
-                         n_seq_by_continent_directory=None,
-                         top_combinations_directory=None,
+                         time_series_directory,
+                         heatmap_table=True,
+                         n_seq_by_continent=True,
+                         variant_combinations=True,
                          continent="Global",
                          exclude_singletons=True,
                          cmap="YlGnBu",
@@ -205,6 +212,27 @@ def time_series_pipeline(meta_path,
     None. All output written to file at directories specified. 
     """
     time_start=time.time()
+    #Define directory paths (all directory paths will eventually be defined here using the time_series_directory)
+    #Metadata and variants
+    metadata_variants_directory=time_series_directory+"Metadata_with_Variants/"
+    #Frequency tables
+    time_series_frequency_directory=time_series_directory+"Time_Series_Frequency/"
+    #Percentage tables
+    time_series_percent_directory=time_series_directory+"Time_Series_Percent/"
+    #Heatmap tables (optional but included by default)
+    if heatmap_table==True:
+        time_series_htmp_table_directory=time_series_directory+"Time_Series_Heatmap_Tables/"
+    #Number of Sequences by Continent (optional but included by default)
+    if n_seq_by_continent==True:
+        n_seq_by_continent_directory=time_series_directory+"Total_Sequences_by_Continent/"
+    #Variant Combinations dataset (optional but included by default)
+    if variant_combinations==True:
+        top_combinations_directory=time_series_directory+"Variant_Combinations/"
+        #Variant Combinations TS: Frequency
+        combos_TS_freq_directory=time_series_directory+"Variant_Combinations_TS_Frequency/"
+        #Variant Combinations TS: Percentage
+        combos_TS_percentage_directory=time_series_directory+"Variant_Combinations_TS_Percentage/" 
+    
     #Return error for incorrect continent entries
     if type(continent)==list:
         #If a list is passed to continent 
@@ -218,14 +246,17 @@ def time_series_pipeline(meta_path,
     #Create output file paths within entered directories
     #Required files
     metadata_variants_out=metadata_variants_directory+protein+"_Metadata_with_Variants.tsv"
-    #Optionl files
+    #Optional files
     if n_seq_by_continent_directory:
         n_seq_by_continent_out=n_seq_by_continent_directory+protein+"_Total_Seq_by_Continent.csv"
     if top_combinations_directory:
         top_combinations_out=top_combinations_directory+protein+"_Variant_Combinations.tsv"
     else:
         top_combinations_out=None
-    
+    if variant_combinations==True:
+        combo_TS_freq_out=combos_TS_freq_directory+protein+"_combo_TS_freq.csv"
+        combo_TS_percent_out=combos_TS_percentage_directory+protein+"_TS_Combo_Percentage.csv"
+        
     #Step 1: generate metadata-cluster pairs
     print("Step 1: Link Metadata to Cluster IDs")
     metadata_with_clusters=prepare_metadata(cluster_path,meta_path,protein,exclude_singletons)
@@ -267,6 +298,11 @@ def time_series_pipeline(meta_path,
     print("End date entered:",end_dates[-1].strftime('%Y-%m-%d'),end=".\n")
     print("Analysis covers {} weeks.".format(len(start_dates)))
     
+    #If time series for variant combinations is specified, store the list of unique variant combinations 
+    if variant_combinations==True:
+        var_combos=define_variant_combos(top_combinations_out)
+        combo_meta=form_combo_metadata(standard_date)
+    
     #Set up list of continents to iterate through, adding an option for global
     #If get_all is specified for continent, all continents and a global analysis will be computed.
     if continent=="get_all":
@@ -293,10 +329,13 @@ def time_series_pipeline(meta_path,
                 print("Global time series information ({}/{})".format(progress,len(continent_list)))
         #Subset the data for the continent for all iterations except for global data
         if continent=="Global":
-            cont_subset=standard_date
+            cont_subset=standard_date.copy()
         else:
             cont_subset=standard_date[standard_date['region']==continent]
-
+        #If variant combinations is specified, create a copy of the subset with the variant column as a string.
+        if variant_combinations==True:
+            combo_subset=form_combo_metadata(cont_subset)
+        
         #Generate filenames for continent-specific outputs
         time_series_freq_out=time_series_frequency_directory+protein+"_Frequency_"+continent+".csv"
         time_series_percent_out=time_series_percent_directory+protein+"_Percent_"+continent+".csv"
@@ -312,6 +351,12 @@ def time_series_pipeline(meta_path,
         #Step 5: Create a percentage table
         global_percentage=percentage_table(time_series_cont,time_series_percent_out)
 
+        #Step 5a: If time series for variant combinations is specified, compute frequency and precentage TS for the current continent 
+        if variant_combinations==True:
+            combo_TS_freq=time_series_combo(combo_subset,var_combos,protein,start_dates,end_dates,combo_TS_freq_out)
+            #Step 5b: Combo Time series percentage table 
+            percentage_table(combo_TS_freq,combo_TS_percent_out)
+            
         #Step 6: Create heatmap table from percentage data
         if time_series_htmp_table_out:
             global_percentage_HT=create_heatmap_table(global_percentage,time_series_htmp_table_out,protein,cmap="YlGnBu",**cmap_kwargs)
@@ -402,7 +447,22 @@ def count_AA_changes(var_list,events):
                     length+=1
             #Add the number of amino acid changes for this indel to the total
             aa_change+=length
-
+        
+        #Extensions: the length of an extension is defined by the number of amino acids added to either end
+        elif code_info["Type"].values=="ext":
+            #A single-residue extension will have a blank for AA_End.
+            if code_info["AA_End(MSA)"].values=="-":
+                aa_change+=1
+            #Multi-residue extension: count the number of non-blank residues added
+            elif code_info["AA_End(MSA)"].values!="-":
+                length=0
+                #Entries are stored as one-element lists by default: must convert element to string 
+                for res in str(code_info["Var Residue(s)"].values[0]): 
+                    if res!="-":
+                        length+=1
+                #Add amino acid changes for extension to total
+                aa_change+=length
+            
     return aa_change
 
 def prepare_metadata(cluster_path,meta_path,protein,exclude_singletons=True):
@@ -579,6 +639,8 @@ def clean_metadata(metadata_with_variants,variant_events,metadata_variants_out=N
     #If vaiants cell is empty, fill it with an empty list. Otherwise, leave it as is.
     fill_nans=lambda x:[] if x is np.nan else x
     standard_date['Variants']=standard_date['Variants'].apply(fill_nans)
+    #The number of variants column must also be filled for sequences with no variants (zeros are added instead of an empty list)
+    standard_date["Number_of_Variants"]=standard_date["Number_of_Variants"].fillna(0)
 
     #Write cleaned file to csv if specified
     if metadata_variants_out:
@@ -827,3 +889,81 @@ def total_seq_by_continent(meta_clean_path,protein,start_date,end_date,output_pa
         seq_continent.to_csv(output_path,chunksize=1000)
         print("Output written to",output_path,sep=" ")
     return seq_continent
+
+def define_variant_combos(variant_combinations_path):
+    """
+    Reads the variant combinations file, which contains all unique combinations in the dataset. Returns the unique variant combinations as a list. 
+    """
+    #Load variant combinations dataset, extract "Variants" column, and store result as a list
+    var_combos=list(pd.read_csv(variant_combinations_path,sep="\t")["Variants"])
+    return var_combos
+
+def form_combo_metadata(meta_clean):
+    """
+    Takes the cleaned metadata used for time series computations of individual variants and converts the lists in the variant colum to strings so combinations can be compared.
+    """
+    combo_meta=meta_clean.copy()
+    combo_meta["Variants"]=combo_meta["Variants"].apply(lambda x:variant_list_to_string(x))
+    return combo_meta
+
+def time_series_combo(combo_meta,var_combos,protein,start_dates,end_dates,combo_TS_freq_out=None,verbose=False):
+    #The list 'data' below will store each column of the time seies analysis.
+    #Each element in the list will be a list of the frequencies of each variant for the week represented by the variant.
+    data=[]
+    #Create list for storing column names for the time series DataFrame
+    column_names=[]
+    #Create list of rownames for dataframe
+    row_names=['Total_Genomes',"Zero_Variants",*var_combos]
+
+    #Iterate through each week in the start-end dates lists
+    for w in range(len(start_dates)):
+        print("Computing Time Series of Variants for Week {} out of {}. {:.1%} complete\r".format(w+1,len(start_dates),(w+1)/len(start_dates)),end="")
+        #Subset dataset for week w.
+        week_w=combo_meta[(combo_meta['date']>=start_dates[w]) & (combo_meta['date']<=end_dates[w])]
+
+        #Store number of sequences in week w with zero variants relative to reference
+        no_mutation_count=len(week_w[week_w["Number_of_Variants"]==0])
+
+        #Create list for storing frequencies of each variant combo during week w
+        combo_freq=[]
+
+        #Use value_counts() to create a series with the frequency of each variant combo in the subset for week w
+        week_w_combo_freq=week_w["Variants"].value_counts()
+
+        #Iteratively check all unique mutation codes against the series.
+        for j in range(len(var_combos)):
+            #If the code is present in the series, record the freq. in the code freq. list.
+            if var_combos[j] in week_w_combo_freq:
+                combo_count=week_w_combo_freq[var_combos[j]]
+                combo_freq.append(combo_count)
+            else:
+                combo_freq.append(0)
+
+        #Formation of column of frequency counts for week w
+        #Add the count of no mutations to the beginning of the code_freq list
+        combo_freq.insert(0,no_mutation_count)
+        #Add total number of sequences to the beginning of the code_freq list (Before the count of no mutations)
+        combo_freq.insert(0,len(week_w))
+
+        #The code_freq list for week w will be appended to the data list
+        data.append(combo_freq)
+
+        #Create the column name for week w and append to column_names
+        name="Week{} ({}-{})".format(w+1,start_dates[w].strftime('%m/%d/%Y'),end_dates[w].strftime('%m/%d/%Y'))
+        column_names.append(name)
+
+    print("Computing Time Series of Variants for Week {} out of {}. {:.1%} complete\r".format(len(start_dates),len(start_dates),1.000),end="")
+    #line below erases progress meter once complete
+    print(" "*100+"\r",end="")
+
+    #Create Pandas DafaFrame from the data
+    #Form a np.array first, then transpose (each list represents a column, and default is for each list to represent a row)
+    data=np.array(data,dtype="int64").transpose()
+    combo_TS_freq=pd.DataFrame(data=data,index=row_names,columns=column_names)
+
+    #Write DataFrame to CSV
+    if verbose==True:
+        print("Writing Time Series Frequency Dataframe to {}.".format(time_series_freq_out))
+    combo_TS_freq.to_csv(combo_TS_freq_out,sep=",",chunksize=1000)
+    
+    return combo_TS_freq

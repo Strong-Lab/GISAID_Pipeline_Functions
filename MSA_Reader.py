@@ -450,6 +450,11 @@ def delins_case(j,i_start,alignment,reference,ref_index,outfile):
     #The function insertion_var_AA() will do this.
     codons_inserted=AA_blank_remover(i_start,i_end,j,alignment)
     
+    #February 14th, 2020
+    #Special Case: amino acid inserted is the same as the amino acids deleted (not really an indel)
+    #if i_first==i_last and reference[i_first]==codons_inserted:
+        #
+    
     #Step 5: Record information using the indeces discovered.
     record_delins_info(i_start,i_end,i_first,i_last,j,codons_inserted,alignment,reference,ref_index,outfile)
     
