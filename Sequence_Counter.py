@@ -38,6 +38,9 @@ def pipeline_seq_counts(main_directory,proteins="get-all",remove_start=0,remove_
     -----------
     counts_df: a DataFrame giving the number of sequences included at each step in the analysis pipeline.
     """
+    #Create dictionary for storing lists of sequence counts for each step
+    counts_by_step=dict()
+    
     #If proteins is set to get-all, build a list of all proteins processed through all five steps.    
     if proteins=="get-all":
         #Search through time_series directory (proteins that were processed through all five steps will be in this directory)

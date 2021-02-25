@@ -394,6 +394,20 @@ def check_region_paths(proteins,region_paths):
             region_paths[protein]=None
     return region_paths
 
+def complex_region_query(protein,resi,target_protein,target_resi):
+    """
+    Accepts a target protein and a list of target residues on that protein and returns True if the time series entry matches the target residues of the target protein. Designed to be used with Pandas.apply() on a time series matrix with a protein and position column to search for time series entries matching a defined region.
+    
+    protein (string): the protein of the entry to be queried against the target. One protein should be entered here as it appears in the time series data.
+    
+    resi (integer): the residue number of the entry to be queried against the target.
+    
+    target_protein (string): the target protein to check the time sreies entry against. One protein should be entered as it appears in the time series data.
+    
+    target_resi (list of integers): target residues to check the time series entry against. Each element must be an integer for the function to work properly.
+    """
+    return (protein==target_protein) and any([resi==target for target in target_resi])
+
 def aggregate_codes(proteins,var_call_dir,region_paths=None,region_name=None,continent="Global",parent_TS_dir=None,region_labels=False,drop_position=True,add_protein=False):
     """
     For a list of proteins entered, create an aggregate dataset of the variants by code tables for each protein.
