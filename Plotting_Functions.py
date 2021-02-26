@@ -45,7 +45,7 @@ def prepare_TS(TS_path,position=False,var_by_code_path=None,subset_codes=None,re
         if type(subset_codes)!=list:
             raise ValueError("Must pass a list or 'None' to subset_residues")
         else:
-            TS=TS[TS["Code"].isin(subset_residues)]
+            TS=TS[TS["Code"].isin(subset_codes)]
             
     #If reindex==True, make the "Code" column of the time series data the new index
     if reindex==True:
