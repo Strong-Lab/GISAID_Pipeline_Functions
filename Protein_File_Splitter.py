@@ -44,6 +44,8 @@ def split_proteins(input_path,directory,date):
     print()
     print("Step 1 of 2")
     print(f"Reading {input_path}")
+    #Store protein names in an empty list
+    protein_names=[]
     with open(input_path,"r") as file:
         #Initialize Counter
         total_sequences=0
