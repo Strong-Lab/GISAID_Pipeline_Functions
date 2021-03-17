@@ -259,6 +259,7 @@ def display_region(code,region):
     else:
         #Return the first and second columns as a string in the format below.
         return "{0} ({1})".format(code,region)
+    
 def display_protein(code,protein):
     """
     Returns a string in the format <protein>: <code> for a variant event passed to it.
@@ -275,6 +276,7 @@ def display_protein(code,protein):
         return code
     else:
         return "{0}: {1}".format(protein,code)
+    
 def display_region_and_protein(code,region,protein):
     """
     Returns a string in the format <protein>: <code> (<region>) for a variant event passed to it.
@@ -1066,65 +1068,6 @@ def long_types(x):
         raise ValueError("Data provided does not match the possible mutation types")
     return output
 
-
-def annotate_heatmap(im, data=None, valfmt="{x:.2f}",
-                     textcolors=("black", "white"),
-                     threshold=None, **textkw):
-    """
-    A function to annotate a heatmap.
-
-    Parameters
-    ----------
-    im
-        The AxesImage to be labeled.
-    data
-        Data used to annotate.  If None, the image's data is used.  Optional.
-    valfmt
-        The format of the annotations inside the heatmap.  This should either
-        use the string format method, e.g. "$ {x:.2f}", or be a
-        `matplotlib.ticker.Formatter`.  Optional.
-    textcolors
-        A pair of colors.  The first is used for values below a threshold,
-        the second for those above.  Optional.
-    threshold
-        Value in data units according to which the colors from textcolors are
-        applied.  If None (the default) uses the middle of the colormap as
-        separation.  Optional.
-    **kwargs
-        All other arguments are forwarded to each call to `text` used to create
-        the text labels.
-    """
-
-    if not isinstance(data, (list, np.ndarray)):
-        data = im.get_array()
-
-    # Normalize the threshold to the images color range.
-    if threshold is not None:
-        threshold = im.norm(threshold)
-    else:
-        threshold = im.norm(data.max())/2.
-
-    # Set default alignment to center, but allow it to be
-    # overwritten by textkw.
-    kw = dict(horizontalalignment="center",
-              verticalalignment="center")
-    kw.update(textkw)
-
-    # Get the formatter in case a string is supplied
-    if isinstance(valfmt, str):
-        valfmt = mtick.StrMethodFormatter(valfmt)
-
-    # Loop over the data and create a `Text` for each "pixel".
-    # Change the text's color depending on the data.
-    texts = []
-    for i in range(data.shape[0]):
-        for j in range(data.shape[1]):
-            kw.update(color=textcolors[int(im.norm(data[i, j]) > threshold)])
-            text = im.axes.text(j, i, valfmt(data[i, j], None), **kw)
-            texts.append(text)
-
-    return texts
-
 def dates_for_graph(start_dates,end_dates):
     """
     Taking the lists start_dates and end_dates as input, dates_for_graph transforms dates to format used for plotting.
@@ -1133,6 +1076,21 @@ def dates_for_graph(start_dates,end_dates):
     for i in range(len(start_dates)):
         newdates.append("{}-{}".format(start_dates[i].strftime("%m/%d"),end_dates[i].strftime("%m/%d")))
     return newdates
+    
+def var_uniq_by_domain(df):
+    """
+    Accepts the variant codes dataset and returns a DataFrame giving the number of mutations observed for each domain.
+    """
+    data=[]
+    for domain in list(df.Domain.unique()):
+        #Store values for domain and number of variants in the domain
+        dom=domain
+        n_var=len(df[df["Domain"]==domain])
+        #Append data for entry as a list, to the list of data
+        data.append([dom,n_var])
+    #Create a dataframe from the list after iteration
+    Vars_by_domain=pd.DataFrame(data,columns=["Domain","Number of Unique Variants"])
+    return Vars_by_domain
     
 def plot_n_seq(n_seq_path,color_dict,marker_list,graph_dates,output_path=None,log=False,**line_kwargs):
     """

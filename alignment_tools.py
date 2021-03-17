@@ -13,9 +13,6 @@ from Bio.Align import MultipleSeqAlignment as msa
 import Bio.SeqRecord
 from Bio import SeqIO
 
-#Import Reference Cluster Finder
-from MSA_Reader import find_ref_cluster_id
-
 def read_seq(path):
     """
     Reads a multiple sequence alignment in FASTA format and stores the sequences in a format readable by the sort_seqs() and manual_correction() functions.
@@ -105,6 +102,6 @@ def sort_FASTA(in_path,out_path):
     """
     Loads a multiple sequence alignment at in_path, sorts sequences in ascending order by their cluster ID, and writes them as a FASTA file to out_path. The sequence headers must be in the format produced by USEARCH for this function to work. 
     """
-    sequences=read_seq(in_path,out_path)
+    sequences=read_seq(in_path)
     sequences=sort_seqs(sequences)
     write_sequences(sequences,out_path)

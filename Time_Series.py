@@ -264,13 +264,14 @@ def time_series_pipeline(meta_path,
 
     #Step 2: generate variant list for each cluster
     print("Step 2: Link Variants to Cluster IDs")
-    variants_each_cluster,variant_events,codes=variant_list_by_cluster(variant_events_path,protein)
+    #UPDATE 2021-03-17: include the reference cluster in the variant list_by_cluster dataset   
+    variants_each_cluster,variant_events,codes=variant_list_by_cluster(variant_events_path,protein,ref_cluster)
     print()
 
     #Step 2a: if desired, generate list of top mutations for the protein
     if top_combinations_out:
         print("Step 2a: Generate Top Mutation Combinations for",protein)
-        top_combinations=find_top_combinations(variants_each_cluster,variant_events,protein)
+        top_combinations=find_top_combinations(variants_each_cluster,cluster_path,protein)
         #For output, the lists of variant combinations need to be converted to comma-separated strings to improve readability.
         top_combinations["Variants"]=top_combinations["Variants"].apply(lambda x:variant_list_to_string(x))
         top_combinations.to_csv(top_combinations_out,sep="\t",chunksize=1000)
@@ -340,7 +341,7 @@ def time_series_pipeline(meta_path,
         time_series_freq_out=time_series_frequency_directory+protein+"_Frequency_"+continent+".csv"
         time_series_percent_out=time_series_percent_directory+protein+"_Percent_"+continent+".csv"
         #Heatmap table generation is optional
-        if time_series_htmp_table_directory:
+        if heatmap_table==True:
             time_series_htmp_table_out=time_series_htmp_table_directory+protein+"_Heatmap_Table_"+continent+".xlsx"
         else:
             time_series_htmp_table_out=None
@@ -358,7 +359,7 @@ def time_series_pipeline(meta_path,
             percentage_table(combo_TS_freq,combo_TS_percent_out)
             
         #Step 6: Create heatmap table from percentage data
-        if time_series_htmp_table_out:
+        if heatmap_table==True:
             global_percentage_HT=create_heatmap_table(global_percentage,time_series_htmp_table_out,protein,cmap="YlGnBu",**cmap_kwargs)
         #Progress meter: increase by one
         progress+=1
@@ -367,7 +368,7 @@ def time_series_pipeline(meta_path,
     print("\nTime Series for {} complete.".format(protein))
     print("Frequency data written to",time_series_frequency_directory)
     print("Percentage data written to",time_series_percent_directory)
-    if time_series_htmp_table_directory:
+    if heatmap_table==True:
         print("Heatmap tables written to",time_series_htmp_table_directory)
     print("Total time elapsed: {}".format(time_end-time_start))
     
@@ -498,8 +499,8 @@ def prepare_metadata(cluster_path,meta_path,protein,exclude_singletons=True):
     #Return metadata-cluster pairs for use in time series pipeline
     return metadata_with_clusters
 
-def variant_list_by_cluster(variant_events_path, protein):
-    #Form filename for variant events dataset using protein name and load dataset
+def variant_list_by_cluster(variant_events_path, protein, ref_cluster):
+   #Form filename for variant events dataset using protein name and load dataset
     print("Loading Variant Data File at",variant_events_path)
     variant_events=pd.read_csv(variant_events_path,sep="\t")
     #Store all unique variant codes observed
@@ -513,6 +514,7 @@ def variant_list_by_cluster(variant_events_path, protein):
     #Create an empty list for storing the variants associated with each cluster, which will be 
     #zipped with the list of unique clusters being used as the iterable to create a new dataframe.
     list_of_variant_lists=[]
+
     #Form for loop using clusters variable from earlier
     for i in range(len(clusters)):
         #Progress meter: update for every fifth code
@@ -532,15 +534,26 @@ def variant_list_by_cluster(variant_events_path, protein):
             variant_list.append(var_code)
         #Add the variant list for cluster i to the list
         list_of_variant_lists.append(variant_list)
+
     print("\rStore variants for cluster IDs: {} of {}. {:.1%} complete.".format(len(clusters),len(clusters),1.00),sep="")
 
     #The list of lists of variants for each cluster will be zipped to the list of cluster ID's, and a dataframe will be created
     data=list(zip(clusters,list_of_variant_lists))
+
+    #Add reference cluster information to the list of variants by cluster
+    #Tuple adds the ref cluster ID and its corresponding empty list of variants to the data
+    data.append((ref_cluster,[]))
+
+    #Ref cluster is added to the end. Next, sort the data in increasing order by cluster number
+    #Lambda function pulls out the first element in the tuple, then takes the text after "Uniq" which is the cluster number.
+    data=sorted(data,key=lambda x:int(x[0].split("Uniq")[1]))
+
     #Set name of column storing cluster info so it can be mapped to the cooresponding cluster in the metadata. 
     cluster_colname="Cluster_Name_"+protein
     #Create Pandas df
     variants_each_cluster=pd.DataFrame(data,columns=[cluster_colname,'Variants'])
-    
+
+
     #Add number of amino acid changes in each cluster to the new dataframe
     print("Adding number of variants column to variants by cluster dataset.")
     tic=time.time()
@@ -551,12 +564,16 @@ def variant_list_by_cluster(variant_events_path, protein):
     #Return the created dataset, along with the variant events table and the list of unique codes, which are used in subsequent steps.
     return variants_each_cluster,variant_events,codes
 
-def find_top_combinations(variants_each_cluster,variant_events,protein):
+def find_top_combinations(variants_each_cluster,cluster_path,protein):
     #Create dataset mapping cluster name to cluster size
-    #Select the cluster ID and cluster size columns and then print the first cluster size entry for each cluster ID subset
-    #(all cluster size entries will be the same for the same cluster ID)
-    size_map=variant_events[["Cluster_ID","Cluster_Size"]].groupby("Cluster_ID").first()
-
+    #Load cluster information file from USEARCH and add column names
+    cluster_info=pd.read_csv(cluster_path,sep="\t",header=None)
+    cluster_info.columns=["Input_ID","Cluster_ID","Cluster_num","Member_num","Cluster_Size","Target_Seq"]
+    #Remove singletons and return one row for each cluster (one row for each sequence is given by default)
+    cluster_info=cluster_info[cluster_info["Cluster_Size"]>=2].groupby("Cluster_num").first()
+    #Select cluster ID and cluster size columns
+    size_map=cluster_info[["Cluster_ID","Cluster_Size"]]
+    
     #Add Cluster Size to variant list dataset
     variants_each_cluster=variants_each_cluster.rename(columns={'Cluster_Name_{}'.format(protein): 'Cluster_ID'})
     top_combinations=variants_each_cluster.merge(size_map,how="inner",on="Cluster_ID")
@@ -758,7 +775,7 @@ def time_series_generation(standard_date,codes,protein,start_dates,end_dates,tim
     print(" "*100+"\r",end="")
     
     #Create Pandas DafaFrame from the data
-    #Form a np.array first, then transpose (each list represents a column, and default is for each list to represent a row)
+    #Form a np.array first, then transpose (each list represents a row, and default is for each list to represent a column)
     data=np.array(data,dtype="int64").transpose()
     time_series_global=pd.DataFrame(data=data,index=row_names,columns=column_names)
     
