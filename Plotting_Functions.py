@@ -1127,21 +1127,99 @@ def long_types(x):
         raise ValueError("Data provided does not match the possible mutation types")
     return output
 
-def dates_for_graph(start_dates,end_dates,include_year=False):
+def dates_for_graph(start_dates,end_dates,date_range=True,numeric_month=True,year=None,format_override=None):
     """
     Taking the lists start_dates and end_dates as input, dates_for_graph transforms dates to format used for plotting.
     
     Optional arguments
     -------------
-    Include_year (default=False): if True, include the year in short format (i.e. 2021 is shown as 21).
+    date_range (default=True): If True, intervals are printed as a range between start and end dates in each category. If False, only the start date is printed.
+    
+    year (default=None): If none, only the month and day are included in the labels (mm/dd). if "all" the year is included in short format (mm/dd/yy) for all entries. If 'first', the year is given in full format, for the first label and any labels that are the first in a new year.
+    
+    format_override (default=None): may pass a string using datetime.strftime() format codes to manually specify a format. see https://docs.python.org/3/library/datetime.html#strftime-strptime-behavior for valid codes. This can be set with date_range to show both the start and end dates, or just the start date.
     """
     newdates=[]
-    if include_year==False:
+    if format_override==None:
+        if year==None:
+            for i in range(len(start_dates)):
+                #Print start and end dates in mm/dd format as a range if date_range==True, and just the start date if date_range==False.
+                if date_range==True:
+                    if numeric_month==True:
+                        newdates.append("{}-{}".format(start_dates[i].strftime("%m/%d"),end_dates[i].strftime("%m/%d")))
+                    elif numeric_month==False:
+                        newdates.append("{}-{}".format(start_dates[i].strftime("%b %d"),end_dates[i].strftime("%b %d")))
+                elif date_range==False:
+                    if numeric_month==True:
+                        newdates.append("{}".format(start_dates[i].strftime("%m/%d")))
+                    elif numeric_month==False:
+                        newdates.append("{}".format(start_dates[i].strftime("%b %d")))
+
+        elif year=="first":
+            #Find the indeces of time stamps in the input that will be reported with the year (first date printed and first date of every new year)
+            #The first element is always given with a year
+            give_year_i=[0]
+            #Find dates that are the first in a new year, if they exist
+            for i in range(len(end_dates)):
+                if i==0:
+                    #Store the year of the first entry as year_before. 
+                    #This is updated with each sample and corresponds to the year of the (i-1)th date. 
+                    year_before=int(end_dates[i].strftime("%Y"))
+                if i>=1:
+                    year=int(end_dates[i].strftime("%Y"))
+                    #If the year for the current date is different than the year of the last date, store the index of the year
+                    if year!=year_before:
+                        give_year_i.append(i)
+                    #Update year_before with the year of the current date for comparison with the next date.
+                    year_before=year
+            #Print date labels with a year for all indicated indeces
+            for i in range(len(start_dates)):
+                if any(i==index for index in give_year_i):
+                    #Print the year before the mm/dd stamp
+                    year=end_dates[i].strftime("%Y")
+                    if date_range==True:
+                        if numeric_month==True:
+                            newdates.append("{}: {}-{}".format(year,start_dates[i].strftime("%m/%d"),end_dates[i].strftime("%m/%d")))
+                        elif numeric_month==False:
+                            newdates.append("{}: {}-{}".format(year,start_dates[i].strftime("%b %d"),end_dates[i].strftime("%b %d")))
+                    elif date_range==False:
+                        if numeric_month==True:
+                            newdates.append("{}: {}".format(year,start_dates[i].strftime("%m/%d")))
+                        elif numeric_month==False:
+                            newdates.append("{}: {}".format(year,start_dates[i].strftime("%b %d")))
+                #Outputs for date ranges that are not on a new year
+                else:
+                    if date_range==True:
+                        if numeric_month==True:
+                            newdates.append("{}-{}".format(start_dates[i].strftime("%m/%d"),end_dates[i].strftime("%m/%d")))
+                        elif numeric_month==False:
+                            newdates.append("{}-{}".format(start_dates[i].strftime("%b %d"),end_dates[i].strftime("%b %d")))
+                    elif date_range==False:
+                        if numeric_month==True:
+                            newdates.append("{}".format(start_dates[i].strftime("%m/%d")))
+                        elif numeric_month==False:
+                            newdates.append("{}".format(start_dates[i].strftime("%b %d")))
+        elif year=="all":
+            for i in range(len(start_dates)):
+                #Print start and end dates in mm/dd/yy format as a range if date_range==True, and just the start date if date_range==False.
+                if date_range==True:
+                    if numeric_month==True:
+                        newdates.append("{}-{}".format(start_dates[i].strftime("%m/%d/%y"),end_dates[i].strftime("%m/%d/%y")))
+                    elif numeric_month==False:
+                        newdates.append("{}-{}".format(start_dates[i].strftime("%b %d %y"),end_dates[i].strftime("%b %d %y")))
+                else:
+                    if numeric_month==True:
+                        newdates.append("{}".format(start_dates[i].strftime("%m/%d/%y"),end_dates[i].strftime("%m/%d/%y")))
+                    elif numeric_month==False:
+                        newdates.append("{}".format(start_dates[i].strftime("%b %d %y"),end_dates[i].strftime("%b %d %y")))
+    
+    #If manual_override is specified, pass the datetime format string to .strftime.
+    elif format_override:
         for i in range(len(start_dates)):
-            newdates.append("{}-{}".format(start_dates[i].strftime("%m/%d"),end_dates[i].strftime("%m/%d")))
-    else:
-        for i in range(len(start_dates)):
-             newdates.append("{}-{}".format(start_dates[i].strftime("%m/%d/%y"),end_dates[i].strftime("%m/%d/%y")))
+            if date_range==True:
+                newdates.append("{}-{}".format(start_dates[i].strftime(format_override),end_dates[i].strftime(format_override)))
+            elif date_range==False:
+                newdates.append("{}".format(start_dates[i].strftime(format_override)))
     return newdates
     
 def var_uniq_by_domain(df):
