@@ -1127,13 +1127,21 @@ def long_types(x):
         raise ValueError("Data provided does not match the possible mutation types")
     return output
 
-def dates_for_graph(start_dates,end_dates):
+def dates_for_graph(start_dates,end_dates,include_year=False):
     """
     Taking the lists start_dates and end_dates as input, dates_for_graph transforms dates to format used for plotting.
+    
+    Optional arguments
+    -------------
+    Include_year (default=False): if True, include the year in short format (i.e. 2021 is shown as 21).
     """
     newdates=[]
-    for i in range(len(start_dates)):
-        newdates.append("{}-{}".format(start_dates[i].strftime("%m/%d"),end_dates[i].strftime("%m/%d")))
+    if include_year==False:
+        for i in range(len(start_dates)):
+            newdates.append("{}-{}".format(start_dates[i].strftime("%m/%d"),end_dates[i].strftime("%m/%d")))
+    else:
+        for i in range(len(start_dates)):
+             newdates.append("{}-{}".format(start_dates[i].strftime("%m/%d/%y"),end_dates[i].strftime("%m/%d/%y")))
     return newdates
     
 def var_uniq_by_domain(df):
