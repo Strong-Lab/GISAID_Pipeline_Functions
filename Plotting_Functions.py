@@ -1029,22 +1029,22 @@ def variant_color_cycler(unique_variants):
         var_kwargs[var_name]=kwargs
     return var_kwargs
 
-def color_shape_cycler(unique_variants,color_list=None,shape_list=None):
+def color_shape_cycler(unique_variants,color_list=None,marker_list=None):
     """
-    Returns a dictionary with matplotlib line2D kwargs used to determine the style of a line plot; properties are assigned to each variant. A maximum of len(color_list)*len(shape_list) unique variants are supported by the function (60 with default color list (12 colors) and shape list (5 shapes)).
+    Returns a dictionary with matplotlib line2D kwargs used to determine the style of a line plot; properties are assigned to each variant. A maximum of len(color_list)*len(marker_list) unique variants are supported by the function (60 with default color list (12 colors) and marker list (5 shapes)).
     
     Arguments:
     ----------
     unique_variants: a list of unique variants in time series data to be plotted. The names of the variants passed should be exactly the same as how they appear in the legend of the plot.
     
-    color_list (optional, default=None): May specify a list of colors to use in the cycler. The number of unique variants supported is equal to the number of colors passed times five. The default color list is used if this is unspecified.
+    color_list (optional, default=None): May specify a list of colors to use in the cycler. The number of unique variants supported is equal to the number of colors passed times the number of markers. The default color list (12 colors) is used if this is unspecified.
     
-    shape_list
+    marker_list (optional, default=None): May specify a list of markers to use in the cycler. The number of unique variants supported is equal to the number of colors passed times the number of markers. The default marker list (5 markers) is used if this is unspecified.
     """
-    if shape_list=None:
+    if marker_list==None:
         markers=["o","D","p","^","s"]
     else:
-        markers=shape_list
+        markers=marker_list
         
     #Use default definition of color list if a color list is not specified
     if not color_list:
@@ -1052,29 +1052,18 @@ def color_shape_cycler(unique_variants,color_list=None,shape_list=None):
 
     #Create dictionary for storing kwargs 
     var_kwargs={}
+    #Return an error if the number of unique variants exceeds the number of unique color-marker combinations (60 by default).
+    if len(unique_variants)>len(markers)*len(color_list):
+         raise ValueError("Cannot create unique color-shape combinations for more than len(color_list)*len(shape_list) variants (60 by default).")
+            
     for i in range(len(unique_variants)):
         var_name=unique_variants[i]
         
-        #Color and shape cycler: shift shape cycling at the end of a full cycle through the color list
-        if i<len(color_list):
-            color=color_list[i%len(color_list)]
-            #Every fifth variant has the same shape, with the iteration shifter every time a full cycle is made through the color list
-            marker=markers[i%5]
-        if i>=len(color_list) and i<2*len(color_list):
-            color=color_list[i%len(color_list)]
-            marker=markers[(i+1)%5]
-        if i>=2*len(color_list) and i<3*len(color_list):
-            color=color_list[i%len(color_list)]
-            marker=markers[(i+2)%5]
-        if i>=3*len(color_list) and i<4*len(color_list):
-            color=color_list[i%len(color_list)]
-            marker=markers[(i+2)%5]                
-        if i>=4*len(color_list) and i<5*len(color_list):
-            color=color_list[i%len(color_list)]
-            marker=markers[(i+2)%5]
-        if i>=5*len(color_list):
-            raise ValueError("Cannot create unique color-shape combinations for more than len(color_list)*5 variants (60 by default).")
-            
+        #Color and shape cycler: shift shape cycling at the end of a full cycle through the color list (when the floor division i//len(color_list) changes
+        color=color_list[i%len(color_list)]
+        markershift=i//len(color_list)
+        marker=markers[(i+markershift)%len(markers)]
+       
         #Create dictionary entry of kwargs for variant i
         kwargs={}
         kwargs["marker"]=marker
