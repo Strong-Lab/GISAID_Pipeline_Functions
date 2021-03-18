@@ -577,6 +577,7 @@ def find_top_combinations(variants_each_cluster,cluster_path,protein):
     #Add Cluster Size to variant list dataset
     variants_each_cluster=variants_each_cluster.rename(columns={'Cluster_Name_{}'.format(protein): 'Cluster_ID'})
     top_combinations=variants_each_cluster.merge(size_map,how="inner",on="Cluster_ID")
+    top_combinations.fillna(value=" ")
     
     #Add Column for number of mutations in cluster
     #top_combinations["Number_of_Variants"]=top_combinations["Variants"].apply(lambda x:count_AA_changes(x,variant_events))

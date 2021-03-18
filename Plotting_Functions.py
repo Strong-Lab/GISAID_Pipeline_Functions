@@ -1029,6 +1029,76 @@ def variant_color_cycler(unique_variants):
         var_kwargs[var_name]=kwargs
     return var_kwargs
 
+def color_shape_cycler(unique_variants,color_list=None,shape_list=None):
+    """
+    Returns a dictionary with matplotlib line2D kwargs used to determine the style of a line plot; properties are assigned to each variant. A maximum of len(color_list)*len(shape_list) unique variants are supported by the function (60 with default color list (12 colors) and shape list (5 shapes)).
+    
+    Arguments:
+    ----------
+    unique_variants: a list of unique variants in time series data to be plotted. The names of the variants passed should be exactly the same as how they appear in the legend of the plot.
+    
+    color_list (optional, default=None): May specify a list of colors to use in the cycler. The number of unique variants supported is equal to the number of colors passed times five. The default color list is used if this is unspecified.
+    
+    shape_list
+    """
+    if shape_list=None:
+        markers=["o","D","p","^","s"]
+    else:
+        markers=shape_list
+        
+    #Use default definition of color list if a color list is not specified
+    if not color_list:
+        color_list=["firebrick","#1E399A","purple","#ABC44C","chocolate","lightcoral","gold","darkcyan","black","#AAAAFF","#111111","#2B8A0A"]
+
+    #Create dictionary for storing kwargs 
+    var_kwargs={}
+    for i in range(len(unique_variants)):
+        var_name=unique_variants[i]
+        
+        #Color and shape cycler: shift shape cycling at the end of a full cycle through the color list
+        if i<len(color_list):
+            color=color_list[i%len(color_list)]
+            #Every fifth variant has the same shape, with the iteration shifter every time a full cycle is made through the color list
+            marker=markers[i%5]
+        if i>=len(color_list) and i<2*len(color_list):
+            color=color_list[i%len(color_list)]
+            marker=markers[(i+1)%5]
+        if i>=2*len(color_list) and i<3*len(color_list):
+            color=color_list[i%len(color_list)]
+            marker=markers[(i+2)%5]
+        if i>=3*len(color_list) and i<4*len(color_list):
+            color=color_list[i%len(color_list)]
+            marker=markers[(i+2)%5]                
+        if i>=4*len(color_list) and i<5*len(color_list):
+            color=color_list[i%len(color_list)]
+            marker=markers[(i+2)%5]
+        if i>=5*len(color_list):
+            raise ValueError("Cannot create unique color-shape combinations for more than len(color_list)*5 variants (60 by default).")
+            
+        #Create dictionary entry of kwargs for variant i
+        kwargs={}
+        kwargs["marker"]=marker
+        kwargs["color"]=color
+
+        #Use special settings for black line
+        if (color=="#111111"):
+            kwargs["mfc"]="#888888"
+            kwargs["mec"]="#111111"
+        else:
+            kwargs["mec"]="#00000088"
+            
+        #Marker size and marker edge width: make pentagon and triangle markers larger
+        if marker=="p" or marker=="^":
+            kwargs["ms"]=10
+            kwargs["mew"]=1
+        else:
+            kwargs["ms"]=8
+            kwargs["mew"]=1
+            
+        #Add kwargs for variant i to the dictionary of variant kwargs, using the variant name as the key
+        var_kwargs[var_name]=kwargs
+    return var_kwargs
+
 """
 Origional_Plotting_Functions
 """
