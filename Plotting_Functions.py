@@ -822,6 +822,11 @@ def line_plot(TS,
               figsize=(14,8),
               axes_bounds="default",
               center_title_to_figure=True,
+              fontsize_x_label=12,
+              fontsize_y_label=12,
+              fontsize_x_ticks=10,
+              fontsize_y_ticks=12,
+              x_label_rotation=45,
               output=None):
     """
     Creates a line plot from time series data
@@ -837,6 +842,26 @@ def line_plot(TS,
     Complex_name: If applicable and specified, print the title of the complex (i.e. RdRP) instead of the protein name. Highly reccomended for aggregate analyses.
     
     color_by_variant (optional, default=None): Can pass a dictionary with variant names as keys and a dictionary of matplotlib line2D properties (such as marker size, marker color, etc.) to plot each unique variant with a desired style.
+    
+    color_list (list): If color_by_variant=None, a list of colors may be passed here. Plotting will cycle through the marker list, moving to the next color each time a new line is created from the data.
+    
+    marker_list (list): If color_by_variant=None, a list of markers may be passed here. Plotting will cycle through the marker list, moving to the next marker each time a new line is created from the data.
+    
+    figsize (tuple): Set the size of the figure in inches (width,height).
+    
+    axes_bounds: May be "default" or "RdRP". Setting the window to "RdRP" changes the width of the window to accomodate longer domain labels in the legend for the polymerase complex.
+    
+    center_title_to_figure (default=True): If false, the title is centered to the plotting window instead of the figure (the figure includes the plotting window and the legend)
+    
+    fontsize_x_label (int, default=12): Defines the font size of the x-axis label in points.
+    
+    fontsize_y_label (int, default=12): Defines the font size of the y-axis label in points.
+    
+    fontsize_x_ticks (int, default=10): Defines the font size of the x-axis tick labels in points.
+     
+    fontsize_y_ticks (int, default=12): Defines the font size of the y-axis tick labels in points.
+    
+    x_label_rotation (int, default=45): Degrees of counterclockwise rotation from horizontal position on axis (90=vertical labels, 0=horizontal labels).
     """
     import matplotlib.ticker as mtick
     #Line Graph for Variant Prevalence Over Time
@@ -868,10 +893,10 @@ def line_plot(TS,
     leg.set_title("Variant",prop={'weight':'medium','size':18})
 
     #Rotate X-axis tick labels
-    plt.setp(ax.get_xticklabels(), rotation= 45, ha="right",rotation_mode="anchor",fontsize=10)
+    plt.setp(ax.get_xticklabels(), rotation=x_label_rotation, ha="right",rotation_mode="anchor",fontsize=fontsize_x_ticks)
 
     #Y-axis text parameters
-    plt.setp(ax.get_yticklabels(),fontsize=12)
+    plt.setp(ax.get_yticklabels(),fontsize=fontsize_y_ticks)
     
     #Adjust y-axis ticks
     ax.set_yticks(np.arange(0,1.1,0.1))
@@ -885,8 +910,8 @@ def line_plot(TS,
     ax.yaxis.set_major_formatter(mtick.PercentFormatter(xmax=1,decimals=0))
     
     #Set axes labels
-    ax.set_ylabel("Prevalence of Variant",fontsize=12)
-    ax.set_xlabel("Collection Date of Sample",fontsize=12)
+    ax.set_ylabel("Prevalence of Variant",fontsize=fontsize_y_label)
+    ax.set_xlabel("Collection Date of Sample",fontsize=fontsize_x_label)
 
     #Define figure title
     if protein and continent=="Global":
@@ -911,11 +936,11 @@ def line_plot(TS,
     ax.grid(which='major',axis='both',color="#DDDDDD",alpha=0.3)
 
     if output:
-        plt.savefig(output)
+        plt.savefig(output,bbox_inches = "tight")
 
     plt.show()
 
-def TS_Heatmap(data,title,dates,outfile=None,figsize=(18,9),barsize=0.8,barfontsize=14,xlabelsize=10,xtitlesize=12,ylabelsize=12,**cbar_kwargs):
+def TS_Heatmap(data,title,dates,outfile=None,figsize=(18,9),barsize=0.8,barfontsize=14,xtitlesize=12,y_tick_properties=None,x_tick_properties=None,**cbar_kwargs):
     """
     Creates a heatmap from the time series subset selected with the title entered.
     
@@ -937,6 +962,13 @@ def TS_Heatmap(data,title,dates,outfile=None,figsize=(18,9),barsize=0.8,barfonts
     import matplotlib.colors as colors
     import matplotlib.cbook as cbook
 
+    #Fill kwarg dictionaries with default values if they are unspecified
+    #Default x-axis font size=10
+    x_tick_properties=fill_defaults(x_tick_properties,{'labelsize':10,'rotation':45})
+    
+    #Check and fill y-axis property kwargs
+    y_tick_properties=fill_defaults(y_tick_properties,{'labelsize':12})
+    
     #Create list from variant names for labels and define data
     intervals=dates
     variants=list(data.index)
@@ -951,8 +983,8 @@ def TS_Heatmap(data,title,dates,outfile=None,figsize=(18,9),barsize=0.8,barfonts
     ax.set_yticks(np.arange(len(variants)))
     ax.set_xticklabels(intervals)
     ax.set_yticklabels(variants)
-    ax.tick_params(which="major",axis='y',width=1.25,labelsize=ylabelsize)
-    ax.tick_params(which="major",axis='x',width=1.25,labelsize=xlabelsize)
+    ax.tick_params(which="major",axis='y',width=1.25,**y_tick_properties)
+    ax.tick_params(which="major",axis='x',width=1.25,**x_tick_properties)
 
     #X-axis Label
     ax.set_xlabel("Collection Date of Sample",fontsize=xtitlesize)
@@ -968,7 +1000,8 @@ def TS_Heatmap(data,title,dates,outfile=None,figsize=(18,9),barsize=0.8,barfonts
     ax.tick_params(which="minor", bottom=False, left=False)
 
     #Rotate labels
-    plt.setp(ax.get_xticklabels(), rotation= 45, ha="right",rotation_mode="anchor")
+    plt.setp(ax.get_xticklabels(), rotation=x_tick_properties['rotation'],ha='right',rotation_mode='anchor')
+    #plt.setp(ax.get_yticklabels(), )
 
     ax.set_title(title, fontsize=24, pad=15)
     if outfile:
@@ -1087,6 +1120,29 @@ def color_shape_cycler(unique_variants,color_list=None,marker_list=None):
         #Add kwargs for variant i to the dictionary of variant kwargs, using the variant name as the key
         var_kwargs[var_name]=kwargs
     return var_kwargs
+
+def fill_defaults(prop_kwargs,default_properties):
+    """
+    Takes a dictionary of keyword arguments passed to a function and fills default arguments with values if they are not provided
+    """
+    #If the dictionary of kwargs is not provided, return the dictionary of default_properties.
+    if not prop_kwargs:
+        return default_properties
+    
+    if type(prop_kwargs) and type(prop_kwargs)!=dict:
+        raise ValueError(f"The specified value '{prop_kwargs}' is not a dictionary.")
+    
+    if type(prop_kwargs)==dict:
+        #Test each default property to see if it exists.
+        for prop in default_properties:
+            try:
+                prop_kwargs[prop]
+            #A key error will be returned if the default property does not exist.
+            except KeyError:
+                #Fill the property with the default setting in this case.
+                prop_kwargs[prop]=default_properties[prop]
+                    
+    return prop_kwargs
 
 """
 Origional_Plotting_Functions
@@ -1237,15 +1293,36 @@ def var_uniq_by_domain(df):
     Vars_by_domain=pd.DataFrame(data,columns=["Domain","Number of Unique Variants"])
     return Vars_by_domain
     
-def plot_n_seq(n_seq_path,color_dict,marker_list,graph_dates,output_path=None,log=False,**line_kwargs):
+def plot_n_seq(n_seq_path,graph_dates,color_dict,marker_list,remove_end=0,output_path=None,x_tick_properties=None,y_tick_properties=None,line_kwargs=None,y_max=None,y_tick_freq=(500,100)):
     """
     Creates a plot for number of sequences by continent and saves it as a .png to the output path, if specified.
+    
+    Arguments
+    ----------
+    
+    y_max (int): May specify the upper bound of the y-limits using this argument.
+    
+    y_tick_freq (tuple): The first element of the tuple specifies the frequency of major tick marks with labels, and the second element specifes the frequency of minor tick marks. Default is (500,100).
     """
+    ##### Argument Set-up #####
+    #Fill default values of x_tick_properties if they are not specified
+    x_tick_properties=fill_defaults(x_tick_properties,{'labelsize':10,'rotation':45})
+               
+    #Check and fill y-axis property kwargs
+    y_tick_properties=fill_defaults(y_tick_properties,{'labelsize':12})
+    #####           
+       
     #Extract protein name from path: by default, protein name is after the last forward slash and before the first underscore
     protein=n_seq_path.split("/")[-1]
     protein=protein.split("_")[0]
+    
     #Load total sequences by continent file
-    n_seq=pd.read_csv(n_seq_path)
+    if remove_end==0:
+        n_seq=pd.read_csv(n_seq_path)
+    elif remove_end>0:
+        n_seq=pd.read_csv(n_seq_path).iloc[:,:-remove_end]
+    elif remove_end<0:
+        raise ValueError("Negative value specified for remove_end.")
     
     #Rename first column to "Continent" and make it the index
     newcols=list(n_seq.columns)
@@ -1265,7 +1342,10 @@ def plot_n_seq(n_seq_path,color_dict,marker_list,graph_dates,output_path=None,lo
     #Create line plot of total number of sequences by continent
 
     #Line Graph for Variant Prevalence Over Time
-    x=graph_dates
+    if remove_end==0:
+        x=graph_dates
+    elif remove_end>0:
+        x=graph_dates[:-remove_end]
     labels=list(n_seq.index)
 
     #Create Figure Frame
@@ -1280,9 +1360,9 @@ def plot_n_seq(n_seq_path,color_dict,marker_list,graph_dates,output_path=None,lo
     leg.set_title("Continent",prop={'weight':'medium','size':18})
     
     #Set axes limits
-    #Standard Scale (log==False, default)
-    if log==False:
-        #Y limits: If the number of sequences in any given week is greater than 7500, adjust the limits of the plot accordingly.
+    #Y limits: automatically calculate if not defined by the user
+    if not y_max:
+        #Automatic calculation: if the number of sequences in any given week is greater than 7500, adjust the limits of the plot accordingly.
         max_value=n_seq.max(axis=1).max()
         if (max_value)>7500:
             #Increase the axis to the next 500 increment above the max; increment by another 500 if the max will be close to the new interval.
@@ -1292,32 +1372,28 @@ def plot_n_seq(n_seq_path,color_dict,marker_list,graph_dates,output_path=None,lo
                 ymax=((max_value//500)+1)*500
         else:
             ymax=7500
-        ax.set_ylim(-20,ymax)
+    elif y_max:
+        ymax=y_max
     
-        #Adjust y-axis ticks
-        ax.set_yticks(np.arange(0,ymax+1,500))
-        ax.set_yticks(np.arange(0,ymax+1,100),minor=True);
-    
-    #Log Scale (log==True)
-    elif log==True:
-        #Y-axes limits
-        ax.set_ylim(bottom=-0.02,top=20000)
-        #Create a logarithmic scale for the y-axis
-        plt.yscale(value="symlog",linthreshy=1,subsy=[2, 3, 4, 5, 6, 7, 8, 9])
-        #Set y axis labels to standard notation (default is scientific with log scales)
-        ax.yaxis.set_major_formatter(mtick.FormatStrFormatter('%.0f'))
-    
+    ax.set_ylim(-20,ymax)
     #X limits: number of columns minus one (zero-index) plus 0.5
     ax.set_xlim(left=-0.5,right=n_seq.shape[1]-0.5)
 
-    #Rotate X-axis tick labels
-    plt.setp(ax.get_xticklabels(), rotation= 45, ha="right",rotation_mode="anchor",fontsize=10)
+    #X-tick properties (ticks and label placement)
+    ax.tick_params(which="major",axis='x',width=1.25,**x_tick_properties)
+    #X-tick text properties
+    plt.setp(ax.get_xticklabels(), ha="right",rotation_mode="anchor")
 
-    #Y-axis text parameters
-    plt.setp(ax.get_yticklabels(),fontsize=12)
+    #Y-axis tick/label parameters
+    ax.tick_params(which="major",axis='y',width=1.25,**y_tick_properties)
+    #plt.setp(ax.get_yticklabels(),**y_tick_properties)
+
+    #Adjust y-axis ticks
+    ax.set_yticks(np.arange(0,ymax+1,y_tick_freq[0]))
+    ax.set_yticks(np.arange(0,ymax+1,y_tick_freq[1]),minor=True);
     
     #Set axes labels
-    ax.set_ylabel("Number of Sequences Analyzed{}".format(" (log-10 scale)" if log==True else ""),fontsize=12)
+    ax.set_ylabel("Number of Sequences Analyzed",fontsize=12)
     ax.set_xlabel("Collection Date of Sample",fontsize=12)
 
     #Figure Title
