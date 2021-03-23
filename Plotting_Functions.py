@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import os
+import math
 from scipy import stats
 import matplotlib.pyplot as plt
 #Table plotting
@@ -1008,7 +1009,89 @@ def TS_Heatmap(data,title,dates,outfile=None,figsize=(18,9),barsize=0.8,barfonts
         plt.savefig(outfile)
 
     plt.show()
+
+def multi_page_heatmap(data,
+                       dates,
+                       n_per_page=75,
+                       common_title=None,
+                       outfile_prefix=None,
+                       figsize=(16,20),
+                       barsize=0.6,
+                       barfontsize=14,
+                       xtitlesize=12,
+                       y_tick_properties=None,
+                       x_tick_properties=None,
+                       cbar_kwargs={'aspect':30}):
+    """
+    For data with large numbers of rows, multi_page_heatmap() will create several different heatmaps to visualize all of the data.
     
+    Arguments
+    -----------
+    data: the data to be visualize. This should be the full data: the data will be split into pages automatically.
+    
+    dates: Date labels generated from the Plotting_Functions.dates_for_graph() function. 
+    
+    n_per_page (default=75): An integer specifying the number of entries to include on each page.
+    
+    common_title: A title to put at the top of the page. If '<page>' is entered, it will be replaced with the current page (ex. 'page 1 of 3')
+    
+    outfile_prefix: If output to file is desired, a path prefix can be entered here with the relative path also defined. "_<page number>_of_<total pages>.png" will be added at the end.
+    
+    outfile: Path for writing the heatmap as a .png (default=None).
+    
+    figsize: Tuple giving the width and height of the figure in inches (default=(18,9)).
+    
+    barsize: Decimal value giving the size of the color bar relative to the plot (default=0.8).
+    """
+    #Number of pages: equal to whole number of len(data) divided by n_per_page, plus one if there is a remainder 
+    n_pages=len(data)//n_per_page
+    if len(data)%n_per_page!=0:
+        n_pages+=1
+
+    #Creating heatmap data: make one for each page, slicing in multiples of n_per_page
+    for page in range(1,n_pages+1):
+        #Create slice intervals for the current page based on the number of entries desired per page
+        lower=n_per_page*(page-1)
+        upper=n_per_page*page
+        #Do not use an upper slice for the last page
+        if page!=n_pages:
+            Tslice=data.iloc[lower:upper,:]
+        else:
+            Tslice=data.iloc[lower:,:]
+        #Create title for current page    
+        page_title=common_title.replace("<page>",f"Page {page} of {n_pages}")
+        #Create output path for current page
+        if outfile_prefix:
+            outfile=outfile_prefix+f"_{page}_of_{n_pages}.png"
+        else:
+            outfile=None
+                
+        #Construct dictionary of colorbar kwargs that may change for different pages
+        page_n_kwargs=dict()
+        for kwarg in cbar_kwargs:
+            page_n_kwargs[kwarg]=cbar_kwargs[kwarg]
+        
+        #Scale color bar aspect ratio for last page based on number of entries
+        try:
+            page_n_kwargs["aspect"]=(page_n_kwargs["aspect"])*(len(Tslice)/n_per_page)
+        except KeyError:
+            page_n_kwargs["aspect"]=(30)*(len(Tslice)/n_per_page)
+        
+        #Scale color bar bar size based on number of entries on last page
+        page_n_barsize=barsize*(len(Tslice)/n_per_page)
+               
+        #Make a heatmaps for the current page
+        TS_Heatmap(data=Tslice,
+                   title=page_title,
+                   dates=dates,
+                   outfile=outfile,
+                   figsize=figsize,
+                   barsize=page_n_barsize, 
+                   barfontsize=barfontsize,
+                   xtitlesize=xtitlesize,
+                   y_tick_properties=y_tick_properties,
+                   x_tick_properties=x_tick_properties,
+                   **page_n_kwargs)
     
 def confirm_output(output):
     choice=input("Write to {}? (y/n) ".format(output))
@@ -1293,7 +1376,7 @@ def var_uniq_by_domain(df):
     Vars_by_domain=pd.DataFrame(data,columns=["Domain","Number of Unique Variants"])
     return Vars_by_domain
     
-def plot_n_seq(n_seq_path,graph_dates,color_dict,marker_list,remove_end=0,output_path=None,x_tick_properties=None,y_tick_properties=None,line_kwargs=None,y_max=None,y_tick_freq=(500,100)):
+def plot_n_seq(n_seq_path,graph_dates,color_dict,marker_list,remove_end=0,log=False,output_path=None,x_tick_properties=None,y_tick_properties=None,line_kwargs=None,y_max=None,y_tick_freq=(500,100)):
     """
     Creates a plot for number of sequences by continent and saves it as a .png to the output path, if specified.
     
@@ -1310,6 +1393,10 @@ def plot_n_seq(n_seq_path,graph_dates,color_dict,marker_list,remove_end=0,output
                
     #Check and fill y-axis property kwargs
     y_tick_properties=fill_defaults(y_tick_properties,{'labelsize':12})
+    
+    #Check for incompatible arguments log=True and user defined y-max
+    if y_max and log==True:
+        raise ValueError("Cannot specify argument y_max when log=True")
     #####           
        
     #Extract protein name from path: by default, protein name is after the last forward slash and before the first underscore
@@ -1342,10 +1429,7 @@ def plot_n_seq(n_seq_path,graph_dates,color_dict,marker_list,remove_end=0,output
     #Create line plot of total number of sequences by continent
 
     #Line Graph for Variant Prevalence Over Time
-    if remove_end==0:
-        x=graph_dates
-    elif remove_end>0:
-        x=graph_dates[:-remove_end]
+    x=graph_dates
     labels=list(n_seq.index)
 
     #Create Figure Frame
@@ -1360,8 +1444,8 @@ def plot_n_seq(n_seq_path,graph_dates,color_dict,marker_list,remove_end=0,output
     leg.set_title("Continent",prop={'weight':'medium','size':18})
     
     #Set axes limits
-    #Y limits: automatically calculate if not defined by the user
-    if not y_max:
+    #Y limits: automatically calculate if not defined by the user, and do not calculate for log scale
+    if log==False and not y_max:
         #Automatic calculation: if the number of sequences in any given week is greater than 7500, adjust the limits of the plot accordingly.
         max_value=n_seq.max(axis=1).max()
         if (max_value)>7500:
@@ -1372,13 +1456,32 @@ def plot_n_seq(n_seq_path,graph_dates,color_dict,marker_list,remove_end=0,output
                 ymax=((max_value//500)+1)*500
         else:
             ymax=7500
-    elif y_max:
+    elif log==False and y_max:
         ymax=y_max
-    
-    ax.set_ylim(-20,ymax)
-    #X limits: number of columns minus one (zero-index) plus 0.5
-    ax.set_xlim(left=-0.5,right=n_seq.shape[1]-0.5)
 
+    elif log==True:
+        max_value=n_seq.max(axis=1).max()
+        #Automatic Y-axis max calculation for log-10 scale
+        #The y-axis max value will be 10^(order_of_magnitude_of_max_value+1)
+        order_of_magnitude=(math.log10(max_value))//1
+        #for a max value of 5,000, this will be 10,000, for a max value of 20,000, this will be 100,000, and so on.
+        ymax=10**(order_of_magnitude+1)
+
+    #If log==False, set y-axis limits with the maximum value defined above. 
+    if log==False:
+        ax.set_ylim(-20,ymax)
+        #X limits: number of columns minus one (zero-index) plus 0.5
+        ax.set_xlim(left=-0.5,right=n_seq.shape[1]-0.5)
+    
+    #If log==True, set y-axis limits using a log scale.
+    elif log==True:
+        #Create a logarithmic scale for the y-axis
+        plt.yscale(value="symlog",linthresh=1,subs=[2, 3, 4, 5, 6, 7, 8, 9])
+        #Set y axis labels to standard notation (default is scientific with log scales)
+        ax.yaxis.set_major_formatter(mtick.FormatStrFormatter('%.0f'))
+        #Y-axes limits: set based on max value
+        ax.set_ylim(bottom=-0.02,top=ymax)
+    
     #X-tick properties (ticks and label placement)
     ax.tick_params(which="major",axis='x',width=1.25,**x_tick_properties)
     #X-tick text properties
@@ -1388,9 +1491,10 @@ def plot_n_seq(n_seq_path,graph_dates,color_dict,marker_list,remove_end=0,output
     ax.tick_params(which="major",axis='y',width=1.25,**y_tick_properties)
     #plt.setp(ax.get_yticklabels(),**y_tick_properties)
 
-    #Adjust y-axis ticks
-    ax.set_yticks(np.arange(0,ymax+1,y_tick_freq[0]))
-    ax.set_yticks(np.arange(0,ymax+1,y_tick_freq[1]),minor=True);
+    #Adjust y-axis ticks (only use for linear graphs)
+    if log==False:
+        ax.set_yticks(np.arange(0,ymax+1,y_tick_freq[0]))
+        ax.set_yticks(np.arange(0,ymax+1,y_tick_freq[1]),minor=True);
     
     #Set axes labels
     ax.set_ylabel("Number of Sequences Analyzed",fontsize=12)
