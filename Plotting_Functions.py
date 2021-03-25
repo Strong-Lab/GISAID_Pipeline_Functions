@@ -823,11 +823,10 @@ def line_plot(TS,
               figsize=(14,8),
               axes_bounds="default",
               center_title_to_figure=True,
+              x_tick_properties=None,
+              y_tick_properties=None,
               fontsize_x_label=12,
               fontsize_y_label=12,
-              fontsize_x_ticks=10,
-              fontsize_y_ticks=12,
-              x_label_rotation=45,
               output=None):
     """
     Creates a line plot from time series data
@@ -865,6 +864,15 @@ def line_plot(TS,
     x_label_rotation (int, default=45): Degrees of counterclockwise rotation from horizontal position on axis (90=vertical labels, 0=horizontal labels).
     """
     import matplotlib.ticker as mtick
+    
+    ##### Argument Set-up #####
+    #Fill default values of x_tick_properties if they are not specified
+    x_tick_properties=fill_defaults(x_tick_properties,{'labelsize':10,'rotation':45})
+               
+    #Check and fill y-axis property kwargs
+    y_tick_properties=fill_defaults(y_tick_properties,{'labelsize':12})
+    #####
+    
     #Line Graph for Variant Prevalence Over Time
     x=graph_dates
     labels=list(TS.index)
@@ -893,12 +901,14 @@ def line_plot(TS,
     leg=ax.legend(bbox_to_anchor=(1.02,0.9),fontsize=14,loc="upper left",markerscale=1.5)
     leg.set_title("Variant",prop={'weight':'medium','size':18})
 
-    #Rotate X-axis tick labels
-    plt.setp(ax.get_xticklabels(), rotation=x_label_rotation, ha="right",rotation_mode="anchor",fontsize=fontsize_x_ticks)
+    #X-tick properties (ticks and label placement)
+    ax.tick_params(which="major",axis='x',width=1.25,**x_tick_properties)
+    #X-tick text properties
+    plt.setp(ax.get_xticklabels(), ha="right",rotation_mode="anchor")
 
-    #Y-axis text parameters
-    plt.setp(ax.get_yticklabels(),fontsize=fontsize_y_ticks)
-    
+    #Y-axis tick/label parameters
+    ax.tick_params(which="major",axis='y',width=1.25,**y_tick_properties)
+
     #Adjust y-axis ticks
     ax.set_yticks(np.arange(0,1.1,0.1))
     ax.set_yticks(np.arange(0,1.1,0.02),minor=True);
@@ -937,7 +947,7 @@ def line_plot(TS,
     ax.grid(which='major',axis='both',color="#DDDDDD",alpha=0.3)
 
     if output:
-        plt.savefig(output,bbox_inches = "tight")
+        plt.savefig(output,bbox_inches = "tight",dpi=600)
 
     plt.show()
 
@@ -1006,7 +1016,7 @@ def TS_Heatmap(data,title,dates,outfile=None,figsize=(18,9),barsize=0.8,barfonts
 
     ax.set_title(title, fontsize=24, pad=15)
     if outfile:
-        plt.savefig(outfile)
+        plt.savefig(outfile,dpi=600)
 
     plt.show()
 
@@ -1227,8 +1237,82 @@ def fill_defaults(prop_kwargs,default_properties):
                     
     return prop_kwargs
 
+def variant_combos(combo_path,var_A,var_B,verbose=False,outfile=None):
+    """
+    Analyzes variant combinations data to determine the number of sequences for which two specified variants ocurr together in, and the number of sequences in which each variant occurs separately.
+    
+    Arguments
+    -----------
+    combo_path (string): path to the variant combinations file for the protein with the desired variants. This will be in Time_Series_Tables/Variant_Combinations/ by default.
+    
+    var_A (string): Code of first variant to analyze, as it appears in the output from the MSA_reader function.  
+    
+    var_B (string): Code of second variant to analyze, as it appears in the output from the MSA_reader function.  
+    
+    verbose (default=False): If true, output sequence counts to the console
+    
+    outfile (default=None): Write table to CSV at the path specified.
+    
+    Returns
+    -----------
+    Tuple of four integer values, which can be used in the construction of a 2x2 contingecy tablle:
+    
+    AandB_total: number of sequences with both variant A and variant B.
+    
+    AnotB_total: number of sequences with variant A and not variant B.
+    
+    BnotA_total: number of sequences with variant B and not variant A.
+    
+    notAB_total: number of sequences with neither variant.
+    """
+    combos=pd.read_csv(combo_path,sep="\t")
+    combos=combos.drop("Unnamed: 0",axis=1)
+    #Must fill N/A value for variants observed in the reference cluster
+    combos=combos.fillna(" ")
+    
+    #If verbose output specified, print total sequences with each variant
+    if verbose==True:
+        print("-"*45)
+        print("Total Sequences with Variant A:",combos[combos["Variants"].apply(lambda x:(var_A in x))]["Cluster_Size"].sum())
+        print("Total Sequences with Variant B:",combos[combos["Variants"].apply(lambda x:(var_B in x))]["Cluster_Size"].sum())
+        print("-"*45)
+    
+    #Sequences with variant A and not variant B
+    AnotB=combos[combos["Variants"].apply(lambda x:(var_A in x) and (var_B not in x))]
+    #Total number of sequences=Sum of cluster sizes listed
+    AnotB_total=AnotB["Cluster_Size"].sum()
+    if verbose==True:
+        print("Number of seuquences with {} and not {}: {}".format(var_A,var_B,AnotB_total))
+    
+    #Sequences with variant B and not variant A
+    BnotA=combos[combos["Variants"].apply(lambda x:(var_A not in x) and (var_B in x))]
+    BnotA_total=BnotA["Cluster_Size"].sum()
+    if verbose==True:
+        print("Number of seuquences with {} and not {}: {}".format(var_B,var_A,BnotA_total))
+        
+    #Sequences with both variant A and variant B
+    AandB=combos[combos["Variants"].apply(lambda x:(var_A in x) and (var_B in x))]
+    AandB_total=AandB["Cluster_Size"].sum()
+    if verbose==True:
+        print("Number of seuquences with {} and {}: {}".format(var_A,var_B,AandB_total))
+    
+    #Sequences wtih neither variant A nor B
+    notAB=combos[combos["Variants"].apply(lambda x:(var_A not in x) and (var_B not in x))]
+    notAB_total=notAB["Cluster_Size"].sum()
+    if verbose==True:
+        print("Number of seuquences with neither {} nor {}: {}".format(var_A,var_B,notAB_total))
+        print("Sum of all elements==Total:",(AandB_total+AnotB_total+BnotA_total+notAB_total)==combos["Cluster_Size"].sum())
+    
+    #Return a Pandas Dataframe with the results, and write to CSV if a path is specifed
+    table=pd.DataFrame([[AandB_total,BnotA_total],[AnotB_total,notAB_total]],index=[f"{var_A} present",f"{var_A} absent"],columns=[f"{var_B} present",f"{var_B} absent"])
+   
+    if outfile:
+        table.to_csv(outfile)
+    
+    return table
+
 """
-Origional_Plotting_Functions
+Origional_Plotting_Functions #######################################################################################################
 """
 def var_uniq_by_domain(df):
     #Print the number of mutations observed for each domain
@@ -1376,7 +1460,7 @@ def var_uniq_by_domain(df):
     Vars_by_domain=pd.DataFrame(data,columns=["Domain","Number of Unique Variants"])
     return Vars_by_domain
     
-def plot_n_seq(n_seq_path,graph_dates,color_dict,marker_list,remove_end=0,log=False,output_path=None,x_tick_properties=None,y_tick_properties=None,line_kwargs=None,y_max=None,y_tick_freq=(500,100)):
+def plot_n_seq(n_seq_path,graph_dates,color_dict,marker_list,remove_end=0,log=False,output_path=None,figsize=(14,8),x_tick_properties=None,y_tick_properties=None,line_kwargs=None,y_max=None,y_tick_freq=(500,100)):
     """
     Creates a plot for number of sequences by continent and saves it as a .png to the output path, if specified.
     
@@ -1433,7 +1517,7 @@ def plot_n_seq(n_seq_path,graph_dates,color_dict,marker_list,remove_end=0,log=Fa
     labels=list(n_seq.index)
 
     #Create Figure Frame
-    fig=plt.figure(figsize=(14,8))
+    fig=plt.figure(figsize=figsize)
     ax = fig.add_axes([0.1,0.2,0.7,0.7])
 
     #Create lines for each of the six continents
@@ -1507,7 +1591,7 @@ def plot_n_seq(n_seq_path,graph_dates,color_dict,marker_list,remove_end=0,log=Fa
     ax.grid(which='major',axis='both',color="#DDDDDD",alpha=0.3)
 
     if output_path:
-        plt.savefig(output_path)
+        plt.savefig(output_path,dpi=600)
 
     plt.show()
     
