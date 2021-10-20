@@ -778,7 +778,7 @@ def top_n_TS_graph(var_call_dir,TS_path,protein,continent,n=10,region_path=None,
 
     #Legend
     leg=ax.legend(bbox_to_anchor=(1.02,0.9),fontsize=14,loc="upper left",markerscale=1.5)
-    leg.set_title("Variant",prop={'weight':'medium','size':18})
+    leg.set_title("Mutation",prop={'weight':'medium','size':18})
 
     #Rotate X-axis tick labels
     plt.setp(ax.get_xticklabels(), rotation= 45, ha="right",rotation_mode="anchor",fontsize=10)
@@ -795,14 +795,14 @@ def top_n_TS_graph(var_call_dir,TS_path,protein,continent,n=10,region_path=None,
     ax.set_ylim(-0.02,1.01)
 
     #Set axes labels
-    ax.set_ylabel("Prevalence of Variant",fontsize=12)
+    ax.set_ylabel("Prevalence of Mutation",fontsize=12)
     ax.set_xlabel("Collection Date of Sample",fontsize=12)
 
     #Figure Title
     if continent=="Global":
-        fig.suptitle("Most Common Variants for {}: Global Prevalence".format(protein),fontsize=26,fontweight='medium')
+        fig.suptitle("Most Common Mutations for {}: Global Prevalence".format(protein),fontsize=26,fontweight='medium')
     else:
-        fig.suptitle("Most Common Variants for {}: Prevalence in {}".format(protein,continent),fontsize=26,fontweight='medium')
+        fig.suptitle("Most Common Mutations for {}: Prevalence in {}".format(protein,continent),fontsize=26,fontweight='medium')
 
     #Create a grid
     ax.grid(which='major',axis='both',color="#DDDDDD",alpha=0.3)
@@ -899,7 +899,7 @@ def line_plot(TS,
             
     #Legend
     leg=ax.legend(bbox_to_anchor=(1.02,0.9),fontsize=14,loc="upper left",markerscale=1.5)
-    leg.set_title("Variant",prop={'weight':'medium','size':18})
+    leg.set_title("Mutation",prop={'weight':'medium','size':18})
 
     #X-tick properties (ticks and label placement)
     ax.tick_params(which="major",axis='x',width=1.25,**x_tick_properties)
@@ -921,18 +921,18 @@ def line_plot(TS,
     ax.yaxis.set_major_formatter(mtick.PercentFormatter(xmax=1,decimals=0))
     
     #Set axes labels
-    ax.set_ylabel("Prevalence of Variant",fontsize=fontsize_y_label)
+    ax.set_ylabel("Prevalence of Mutation",fontsize=fontsize_y_label)
     ax.set_xlabel("Collection Date of Sample",fontsize=fontsize_x_label)
 
     #Define figure title
     if protein and continent=="Global":
-        title="Most Common Variants for {}: Global Prevalence".format(protein)
+        title="Most Common Mutations for {}: Global Prevalence".format(protein)
     elif protein and continent!="Global":
-        title="Most Common Variants for {}: {}".format(protein,continent)
+        title="Most Common Mutations for {}: {}".format(protein,continent)
     elif complex_name and continent=="Global":
-        title="Most Common Variants for {}: Global Prevalence".format(complex_name)
+        title="Most Common Mutations for {}: Global Prevalence".format(complex_name)
     elif complex_name and continent!="Global":
-        title="Most Common Variants for {}: {}".format(complex_name,continent)
+        title="Most Common Mutations for {}: {}".format(complex_name,continent)
     #Warn and print no title for invalid combinations
     elif (complex_name and protein) or (not complex_name and not protein):
         warnings.warn("Invalid combination of input for 'protein' and 'complex_name' arguments. Please specify input for either 'protein' or 'complex_name' (not both or neither).",category=UserWarning)
@@ -947,7 +947,7 @@ def line_plot(TS,
     ax.grid(which='major',axis='both',color="#DDDDDD",alpha=0.3)
 
     if output:
-        plt.savefig(output,bbox_inches = "tight",dpi=600)
+        plt.savefig(output,bbox_inches = "tight",dpi=450)
 
     plt.show()
 
@@ -1002,7 +1002,7 @@ def TS_Heatmap(data,title,dates,outfile=None,figsize=(18,9),barsize=0.8,barfonts
     
     #Define Colorbar
     cbar=plt.colorbar(im, ax=ax, shrink=barsize, format=mtick.PercentFormatter(xmax=1,decimals=2),ticks=[0.001,0.002,0.005,0.01,0.02,0.05,0.1,0.2,0.5,1],**cbar_kwargs)
-    cbar=cbar.ax.set_ylabel("Percentage of Sequences With Variant", rotation=-90, va="bottom",fontsize=barfontsize)#Scale fontsize to change with changes in the bar size
+    cbar=cbar.ax.set_ylabel("Percentage of Sequences With Mutation", rotation=-90, va="bottom",fontsize=barfontsize)#Scale fontsize to change with changes in the bar size
 
     #Minor ticks, which center labels above intervals and variants, and create a border between values
     ax.set_xticks(np.arange(len(intervals)+1)-.5, minor=True)
@@ -1016,7 +1016,7 @@ def TS_Heatmap(data,title,dates,outfile=None,figsize=(18,9),barsize=0.8,barfonts
 
     ax.set_title(title, fontsize=24, pad=15)
     if outfile:
-        plt.savefig(outfile,dpi=600)
+        plt.savefig(outfile,dpi=450)
 
     plt.show()
 
@@ -1301,10 +1301,10 @@ def variant_combos(combo_path,var_A,var_B,verbose=False,outfile=None):
     notAB_total=notAB["Cluster_Size"].sum()
     if verbose==True:
         print("Number of seuquences with neither {} nor {}: {}".format(var_A,var_B,notAB_total))
-        print("Sum of all elements==Total:",(AandB_total+AnotB_total+BnotA_total+notAB_total)==combos["Cluster_Size"].sum())
+        print("Sum of all elements==Total:",(AandB_total+BnotA_total+AnotB_total+notAB_total)==combos["Cluster_Size"].sum())
     
     #Return a Pandas Dataframe with the results, and write to CSV if a path is specifed
-    table=pd.DataFrame([[AandB_total,BnotA_total],[AnotB_total,notAB_total]],index=[f"{var_A} present",f"{var_A} absent"],columns=[f"{var_B} present",f"{var_B} absent"])
+    table=pd.DataFrame([[AandB_total,AnotB_total],[BnotA_total,notAB_total]],index=[f"{var_A} present",f"{var_A} absent"],columns=[f"{var_B} present",f"{var_B} absent"])
    
     if outfile:
         table.to_csv(outfile)
@@ -1554,8 +1554,6 @@ def plot_n_seq(n_seq_path,graph_dates,color_dict,marker_list,remove_end=0,log=Fa
     #If log==False, set y-axis limits with the maximum value defined above. 
     if log==False:
         ax.set_ylim(-20,ymax)
-        #X limits: number of columns minus one (zero-index) plus 0.5
-        ax.set_xlim(left=-0.5,right=n_seq.shape[1]-0.5)
     
     #If log==True, set y-axis limits using a log scale.
     elif log==True:
@@ -1565,6 +1563,9 @@ def plot_n_seq(n_seq_path,graph_dates,color_dict,marker_list,remove_end=0,log=Fa
         ax.yaxis.set_major_formatter(mtick.FormatStrFormatter('%.0f'))
         #Y-axes limits: set based on max value
         ax.set_ylim(bottom=-0.02,top=ymax)
+    
+    #X limits: number of columns minus one (zero-index) plus 0.5
+    ax.set_xlim(left=-0.5,right=n_seq.shape[1]-0.5)
     
     #X-tick properties (ticks and label placement)
     ax.tick_params(which="major",axis='x',width=1.25,**x_tick_properties)
@@ -1591,7 +1592,7 @@ def plot_n_seq(n_seq_path,graph_dates,color_dict,marker_list,remove_end=0,log=Fa
     ax.grid(which='major',axis='both',color="#DDDDDD",alpha=0.3)
 
     if output_path:
-        plt.savefig(output_path,dpi=600)
+        plt.savefig(output_path,dpi=450)
 
     plt.show()
     

@@ -14,6 +14,8 @@ import numpy as np
 import pandas as pd
 import warnings
 
+from Global_Scripts import Plotting_Functions as plotf
+
 def pipeline_seq_counts(main_directory,proteins="get-all",remove_start=0,remove_end=0):
     """
     Returns a dataframe giving the number of sequences included at each of the following steps in the GISAID analysis pipeline
@@ -28,7 +30,7 @@ def pipeline_seq_counts(main_directory,proteins="get-all",remove_start=0,remove_
     -----------
     main_directory (string): path to the directory with the 'batch' of proteins (batch is a single download from GISAID). The path should point to the master directory which contains the subdirectories Raw_FASTA, Filtered_Sequences, Seq_Derep, etc.
 
-    proteins (list): a list giving the protein names for which to generate sequence counts. May alternately be the string "get-all" to compute counts for all proteins in the directory.
+    proteins (list): a list giving the protein names for which to generate sequence counts. May alternately be the string "get-all" to compute counts for all proteins in the directory for which time series data was computed.
     
     remove_start (integer, default=0):  a positive integer or zero giving the number of weeks to exclude from the start of the time series.
     
@@ -40,7 +42,6 @@ def pipeline_seq_counts(main_directory,proteins="get-all",remove_start=0,remove_
     """
     #Create dictionary for storing lists of sequence counts for each step
     counts_by_step=dict()
-    
     #If proteins is set to get-all, build a list of all proteins processed through all five steps.    
     if proteins=="get-all":
         #Search through time_series directory (proteins that were processed through all five steps will be in this directory)
@@ -99,7 +100,7 @@ def pipeline_seq_counts(main_directory,proteins="get-all",remove_start=0,remove_
     step="Metadata-Sequence Pairs Included in Time Series Analysis"
     directory="{}Time_Series_Tables/Time_Series_Frequency/".format(main_directory)
     print("Step {0} of {1}: {2}".format(progress,5,step))
-    sequence_counts=count_TS(directory,proteins,remove_end=2)
+    sequence_counts=count_TS(directory,proteins,remove_start=remove_start,remove_end=remove_end)
     #Add list of counts to dictionary under the step
     counts_by_step[step]=sequence_counts
     #Progress meter: advance by one
@@ -224,7 +225,6 @@ def count_TS(directory,proteins,remove_start=0,remove_end=0):
         print("Counting: ({0} of {1})\r".format(i+1,len(proteins)),end="")
         #Sequences in Time Series Analysis: sum of 'total genomes' row of global TS frequency data
         path=find_TS_path(directory, proteins[i])
-        import Plotting_Functions as plotf
         #Return an error if negative values are entered for remove_start or remove_end 
         if remove_start<0 or remove_end<0:
             raise ValueError("Negative value for remove_start and/or remove_end.")
@@ -258,7 +258,7 @@ def find_path(directory,protein):
     #Iterate through all files in the directory
     for filename in os.listdir(directory):
         #Protein name may be in uppercase or title case depending the script that created the file
-        if (protein.upper() in filename) or (protein in filename):
+        if (protein.upper()==filename.split("_")[0]) or (protein==filename.split("_")[0]):
             files_found+=1
             path=directory+filename
 
@@ -289,7 +289,7 @@ def load_FASTA(directory,protein):
     #Iterate through all files in the directory
     for filename in os.listdir(directory):
         #Protein name may be in uppercase or title case depending the script that created the file
-        if (protein.upper() in filename) or (protein in filename):
+        if (protein.upper()==filename.split("_")[0]) or (protein==filename.split("_")[0]):
             files_found+=1
             seq_path=directory+filename
 
@@ -323,7 +323,7 @@ def find_TS_path(directory,protein):
     #Iterate through all files in the directory
     for filename in os.listdir(directory):
         #Protein name may be in uppercase or title case depending the script that created the file
-        if ((protein.upper() in filename) or (protein in filename))&("Global" in filename):
+        if ((protein.upper()==filename.split("_")[0]) or (protein==filename.split("_")[0]))&("Global" in filename):
             files_found+=1
             path=directory+filename
 
