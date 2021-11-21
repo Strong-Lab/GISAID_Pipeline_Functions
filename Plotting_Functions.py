@@ -565,7 +565,7 @@ def aggregate_codes(proteins,var_call_dir,region_paths=None,region_name=None,con
         #Form and return aggregate dataset
         return pd.concat(codes_ag,axis=0)
 
-def prepare_top_n(var_call_dir,TS_dir,protein,continent="Global",n=10,aggregate=False,region_path=None,by_continent=False):
+def prepare_top_n(var_call_dir,TS_dir,protein,continent="Global",n=10,aggregate=False,region_path=None,by_continent=False,drop_position=True):
     """
     Outputs the time series data for the top n most common variants for the protein or proteins entered, on the provided continent.
 
@@ -584,6 +584,8 @@ def prepare_top_n(var_call_dir,TS_dir,protein,continent="Global",n=10,aggregate=
     region_path (optional, default: None): If region information is desired, a string giving the path to the region information file (domain,subunit,subdomain info etc.) must be provided. For aggregate analysis of multiple proteins, region_path must be a dictionary giving the paths for each protein for which region info is desired.
     
     by_continent (optional, default: False): if True, use the n most common variants in the continent indicated instead of worldwide. 
+    
+    drop_position (optional, default: True): set to False to include the position column in the output matrix.
     
     Returns
     ----------
@@ -668,7 +670,8 @@ def prepare_top_n(var_call_dir,TS_dir,protein,continent="Global",n=10,aggregate=
         
         #B.3. Drop position column from the time series table
         #The "Position" Column, created by prepare_TS() and used if a region path is defined, is no longer necessary and will be dropped from analysis. 
-        TS=TS.drop("Position",axis=1)
+        if drop_position==True:
+            TS=TS.drop("Position",axis=1)
         
         #B.4. Subset for top n variants, worldwide or for the specified continent.
         #B.4.a. If by_continent is set to True, subset variant codes by the top n most common variants on the desired continent
